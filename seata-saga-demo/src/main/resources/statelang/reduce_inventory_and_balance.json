@@ -1,0 +1,148 @@
+{
+  "Name": "reduceInventoryAndBalance",
+  "Comment": "reduce inventory then reduce balance in a transaction",
+  "StartState": "OrderService",
+  "Version": "0.0.1",
+  "States": {
+    "OrderService": {
+      "Type": "ServiceTask",
+      "ServiceName": "orderService",
+      "ServiceMethod": "reduce",
+      "CompensateState": "CompensateReduceOrder",
+      "Next": "ChoiceState1",
+      "Input": [
+        "$.[businessKey]",
+        "$.[count]"
+      ],
+      "Output": {
+        "orderServiceResult": "$.#root"
+      },
+      "Status": {
+        "#root == true": "SU",
+        "#root == false": "FA",
+        "$Exception{java.lang.Throwable}": "UN"
+      },
+      "Catch": [
+        {
+          "Exceptions": [
+            "java.lang.Throwable"
+          ],
+          "Next": "CompensationTrigger"
+        }
+      ]
+    },
+    "ChoiceState1": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Expression": "[orderServiceResult] == true",
+          "Next": "StorageService"
+        }
+      ],
+      "Default": "Fail"
+    },
+    "StorageService": {
+      "Type": "ServiceTask",
+      "ServiceName": "storageService",
+      "ServiceMethod": "reduce",
+      "CompensateState": "CompensateReduceStorage",
+      "Next": "ChoiceState2",
+      "Input": [
+        "$.[businessKey]",
+        "$.[count]",
+        {
+          "throwException": "$.[mockReduceBalanceFail]"
+        }
+      ],
+      "Output": {
+        "storageServiceResult": "$.#root"
+      },
+      "Status": {
+        "#root == true": "SU",
+        "#root == false": "FA",
+        "$Exception{java.lang.Throwable}": "UN"
+      },
+      "Catch": [
+        {
+          "Exceptions": [
+            "java.lang.Throwable"
+          ],
+          "Next": "CompensationTrigger"
+        }
+      ]
+    },
+    "ChoiceState2": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Expression": "[storageServiceResult] == true",
+          "Next": "PayService"
+        }
+      ],
+      "Default": "Fail"
+    },
+    "PayService": {
+      "Type": "ServiceTask",
+      "ServiceName": "payService",
+      "ServiceMethod": "reduce",
+      "CompensateState": "CompensateReducePay",
+      "Next": "Succeed",
+      "Input": [
+        "$.[businessKey]",
+        "$.[amount]"
+      ],
+      "Output": {
+        "payServiceResult": "$.#root"
+      },
+      "Status": {
+        "#root == true": "SU",
+        "#root == false": "FA",
+        "$Exception{java.lang.Throwable}": "UN"
+      },
+      "Catch": [
+        {
+          "Exceptions": [
+            "java.lang.Throwable"
+          ],
+          "Next": "CompensationTrigger"
+        }
+      ]
+    },
+    "CompensateReduceOrder": {
+      "Type": "ServiceTask",
+      "ServiceName": "orderService",
+      "ServiceMethod": "compensateReduce",
+      "Input": [
+        "$.[businessKey]"
+      ]
+    },
+    "CompensateReduceStorage": {
+      "Type": "ServiceTask",
+      "ServiceName": "storageService",
+      "ServiceMethod": "compensateReduce",
+      "Input": [
+        "$.[businessKey]"
+      ]
+    },
+    "CompensateReducePay": {
+      "Type": "ServiceTask",
+      "ServiceName": "payService",
+      "ServiceMethod": "compensateReduce",
+      "Input": [
+        "$.[businessKey]"
+      ]
+    },
+    "CompensationTrigger": {
+      "Type": "CompensationTrigger",
+      "Next": "Fail"
+    },
+    "Succeed": {
+      "Type": "Succeed"
+    },
+    "Fail": {
+      "Type": "Fail",
+      "ErrorCode": "PURCHASE_FAILED",
+      "Message": "purchase failed"
+    }
+  }
+}
